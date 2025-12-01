@@ -41,6 +41,39 @@ Harnessing Koopman theory and modern deep learning, this repository delivers a f
 
 ---
 
+## Manuscript Roadmap (ISAV 2023)
+
+The repository mirrors every phase presented in the conference manuscript `ISAV202396601701549000.pdf`:
+
+### 🧪 Data Acquisition & Preprocessing
+- **Governing equation**: The forced Duffing oscillator  
+  $$\ddot{x} + \delta\,\dot{x} + \alpha x + \beta x^{3} = \gamma \cos(\omega t)$$
+- **Baseline parameters**: δ = 0.3, α = −1.0, β = 1.0, ω = 1.2.
+- **Initial conditions**: x₀ = 1.5 m, v₀ = −1.5 m/s with additive uniform noise ∈ [−0.5, 0.5] to emulate measurement uncertainty.
+- **Integrator**: Fourth-order Runge–Kutta implemented in `Duffing_Solution/dataloaders/Runge_Kutta.py` with long horizons (50 000 samples) to capture steady-state behavior.
+- **Normalization pipeline**: Statistics (mean/variance) flow through the encoder, with a rescaler block restoring physical units after the recurrent decoder—matching the manuscript’s Section 3.2.
+
+### 🧱 Network Architecture
+- **Encoder**: Stacked Inception-style 1D CNN blocks (`Model/encoder.py`) extract multiscale temporal features (see Table 1 in the manuscript).
+- **Koopman linear layer**: A bias-free fully connected block represents the finite-dimensional Koopman operator, isolating the linear evolution step.
+- **Decoder**: A two-layer LSTM (`Model/decoder.py`) reconstructs trajectories from Koopman-evolved latents, optionally followed by rescaling heads for denormalized outputs.
+- **Configuration hooks**: `config.yaml` exposes window size (default 200 samples), Koopman horizon `KPH`, and optimizer hyperparameters listed in Table 2 of the paper.
+
+### 🏋️‍♀️ Training Strategy
+- **Stage 1**: End-to-end optimization with SGD (lr = 5e−2, momentum = 0.9, weight decay = 1e−4) to learn nonlinear embeddings.
+- **Stage 2**: Freeze all layers except the Koopman matrix and minimize  
+  $$\sum_{n = n_0}^{n_0 + \mathrm{KPH}} \mathcal{L}\bigl(g(x_n)\, W_K^{n},\, g(x_n)\, W_K\bigr)$$
+  ensuring the Koopman operator remains the sole linear evolution map.
+- **Implementation**: The two-stage schedule is scripted in `Loss/Koopman_repeat.py` and `Deeplearning/Base.py`, faithfully reproducing Algorithm 1 in the manuscript.
+
+### 📈 Reported Results
+- **Periodic regime (γ = 0.2 N)**: Accurate forecasts even with heavy noise injections; resilience holds for perturbations within (−1, 1).
+- **Quasi-periodic regime (γ = 0.37 N)**: The model maintains phase-locking accuracy and predicts steady-state envelopes despite stochastic disturbances.
+- **Koopman spectrum**: Eigenvalue diversity exceeds EDMD baselines—Figure 5 of the paper—thanks to the learned observable basis.
+- **Assets in repo**: Generated plots, GIFs, and eigenvalue visualizations reside under `Duffing_Solution/results/` and `Images/` for side-by-side comparison with the manuscript figures.
+
+---
+
 ## Repository Map
 
 - `Duffing_Solution/` — Data generation, numerical solvers, visualization scripts, and an enthusiastic README that doubles as a user manual.
